@@ -1,2 +1,7 @@
-LANGDB_API_KEY = "langdb_eFNkWGI0NXp4UVV2UzZqUUdBckFBWFlTd1Q1bUw0"
-LANGDB_PROJECT_ID = "4c9308d5-0dbf-4f4c-88dc-6aff9392770c"
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+LANGDB_API_KEY = os.getenv("LANGDB_API_KEY")
+LANGDB_PROJECT_ID = os.getenv("LANGDB_PROJECT_ID")
