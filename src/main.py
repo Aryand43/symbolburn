@@ -1,9 +1,11 @@
 import sys
 from .langdb_client import LangDBClient
 from .config import LANGDB_API_KEY, LANGDB_PROJECT_ID
+from .neural_generator import NeuralGenerator
 
 def main():
     client = LangDBClient(api_key=LANGDB_API_KEY, project_id=LANGDB_PROJECT_ID)
+    generator = NeuralGenerator(langdb_client=client)
 
     available_models = [
         "gpt-4.1-nano",
@@ -32,16 +34,15 @@ def main():
     print(f"\nSelected Model: {selected_model}")
 
     try:
-        chat_completion_response = client.create_chat_completion(
+        response = generator.generate(
             model=selected_model,
             messages=[{"role": "user", "content": "Write a haiku about recursion in programming."}
             ],
             temperature=0.8,
-            max_tokens=1000,
-            top_p=0.9,
-            stream=False
+            max_tokens=1000
         )
-        print("\nChat Completion Response:", chat_completion_response)
+        print("\nGenerated Text:", response["text"])
+        print("\nRaw API Response:", response["raw"])
 
     except Exception as e:
         print(f"An error occurred: {e}")
