@@ -50,6 +50,7 @@ def main():
         print("\nGenerated Text:", neural_output["text"])
         print("\nRaw API Response:", neural_output["raw"])
         print("\nComputed Entropy:", neural_output["entropy"])
+        print("\nTool Flag:", neural_output["tool_flag"])
 
         # Call the scheduler to get a routing decision
         routing_decision = scheduler.route(neural_output)

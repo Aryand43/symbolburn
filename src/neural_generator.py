@@ -1,10 +1,12 @@
 from .langdb_client import LangDBClient
 from .feature_extraction.entropy_extractor import EntropyExtractor
+from .feature_extraction.tool_intent_extractor import ToolIntentExtractor
 
 class NeuralGenerator:
     def __init__(self, langdb_client: LangDBClient):
         self.langdb_client = langdb_client
         self.entropy_extractor = EntropyExtractor()
+        self.tool_intent_extractor = ToolIntentExtractor()
 
     def generate(self, model: str, messages: list, temperature: float, max_tokens: int):
         # Perform the API call using LangDBClient, requesting logprobs
@@ -13,7 +15,7 @@ class NeuralGenerator:
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,
-            logprobs=True,
+            logprobs=True,  # Request logprobs from the API
             stream=False
         )
 
@@ -26,8 +28,12 @@ class NeuralGenerator:
         # Compute entropy
         entropy_value = self.entropy_extractor.compute_entropy(raw_response)
 
+        # Extract tool flag
+        tool_flag_value = self.tool_intent_extractor.extract_tool_flag(raw_response)
+
         return {
             "text": text_content,
             "raw": raw_response,
-            "entropy": entropy_value
+            "entropy": entropy_value,
+            "tool_flag": tool_flag_value
         }
