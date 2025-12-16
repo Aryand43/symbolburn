@@ -13,3 +13,4 @@ class ToolIntentExtractor:
             if message.get(key) is not None:
                 return True
         return False
+

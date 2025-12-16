@@ -4,13 +4,17 @@ from .config import LANGDB_API_KEY, LANGDB_PROJECT_ID
 from .neural_generator import NeuralGenerator
 from .scheduler import Scheduler
 from .strategies.direct_response_strategy import DirectResponseStrategy
+from .strategies.high_entropy_strategy import HighEntropyStrategy
 
 def main():
     client = LangDBClient(api_key=LANGDB_API_KEY, project_id=LANGDB_PROJECT_ID)
     generator = NeuralGenerator(langdb_client=client)
 
-    # Initialize Scheduler with strategies
-    strategies = [DirectResponseStrategy()]
+    # Initialize Scheduler with strategies (HighEntropyStrategy first)
+    strategies = [
+        HighEntropyStrategy(threshold=0.5),  # Example threshold
+        DirectResponseStrategy()
+    ]
     scheduler = Scheduler(strategies=strategies)
 
     available_models = [
