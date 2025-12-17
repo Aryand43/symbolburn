@@ -35,5 +35,6 @@ class NeuralGenerator:
             "text": text_content,
             "raw": raw_response,
             "entropy": entropy_value,
-            "tool_flag": tool_flag_value
+            "tool_flag": tool_flag_value,
+            "messages": messages # Include original messages in the output
         }

@@ -50,15 +50,19 @@ def main():
             ],
             temperature=0.8,
             max_tokens=1000
-        )
         print("\nGenerated Text:", neural_output["text"])
         print("\nRaw API Response:", neural_output["raw"])
         print("\nComputed Entropy:", neural_output["entropy"])
         print("\nTool Flag:", neural_output["tool_flag"])
 
         # Call the scheduler to get a routing decision
-        routing_decision = scheduler.route(neural_output)
-        print(f"\nRouting Decision: {routing_decision}")
+        routing_decision_output = scheduler.route(neural_output)
+        if "routing_decision" in routing_decision_output:
+            print(f"\nRouting Decision: {routing_decision_output["routing_decision"]}")
+        else:
+            print("\nValidation Results:")
+            for key, value in routing_decision_output.items():
+                print(f"  {key}: {value}")
 
     except Exception as e:
         print(f"An error occurred: {e}")

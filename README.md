@@ -1,4 +1,6 @@
-# LangDB AI Gateway Client
+# symbolburn
+
+Submitted to ACL 2026 under the guidance of Prof. Anupam Chattopadhyay.
 
 This project demonstrates an AI gateway client for LangDB, structured using Separation of Concerns and the Strategy Pattern.
 

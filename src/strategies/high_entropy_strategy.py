@@ -7,3 +7,4 @@ class HighEntropyStrategy:
         if entropy is not None and entropy > self.threshold:
             return "fallback_validation"
         return None
+
