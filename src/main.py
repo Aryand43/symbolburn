@@ -46,10 +46,10 @@ def main():
     try:
         neural_output = generator.generate(
             model=selected_model,
-            messages=[{"role": "user", "content": "Write a haiku about recursion in programming."}
-            ],
+            messages=[{"role": "user", "content": "Write a haiku about recursion in programming."}],
             temperature=0.8,
             max_tokens=1000
+        )
         print("\nGenerated Text:", neural_output["text"])
         print("\nRaw API Response:", neural_output["raw"])
         print("\nComputed Entropy:", neural_output["entropy"])
@@ -63,6 +63,9 @@ def main():
             print("\nValidation Results:")
             for key, value in routing_decision_output.items():
                 print(f"  {key}: {value}")
+            if "factual_score" in routing_decision_output:
+                print(f"  Factual Score: {routing_decision_output["factual_score"]}")
+                print(f"  Factual Flag: {routing_decision_output["factual_flag"]}")
 
     except Exception as e:
         print(f"An error occurred: {e}")
