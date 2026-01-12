@@ -8,14 +8,12 @@ from .strategies.direct_response_strategy import DirectResponseStrategy
 from .strategies.high_entropy_strategy import HighEntropyStrategy
 
 from .validators.nli_contradiction_validator import NLIContradictionValidator
-from .validators.factuality_validator import FactualityValidator
 
 def run_evaluation(model_id: str = "gpt-4.1-nano", output_csv_path: str = "evaluation_results.csv"):
     client = LangDBClient(api_key=LANGDB_API_KEY, project_id=LANGDB_PROJECT_ID)
     generator = NeuralGenerator(langdb_client=client)
 
     nli_validator = NLIContradictionValidator()
-    factuality_validator = FactualityValidator()
 
     strategies = [
         HighEntropyStrategy(threshold=0.5),  # Example threshold
@@ -53,10 +51,9 @@ def run_evaluation(model_id: str = "gpt-4.1-nano", output_csv_path: str = "evalu
             if routing_decision_output.get("routing_decision") == "fallback_validation":
                 # Run validators only if routing decision is fallback_validation
                 nli_validation_results = nli_validator.validate(neural_output)
-                factuality_validation_results = factuality_validator.validate(neural_output)
-            
+
             # Merge all results
-            all_results = {**neural_output, **routing_decision_output, **nli_validation_results, **factuality_validation_results}
+            all_results = {**neural_output, **routing_decision_output, **nli_validation_results}
 
             result = {
                 "prompt": prompt_content,\
@@ -65,8 +62,8 @@ def run_evaluation(model_id: str = "gpt-4.1-nano", output_csv_path: str = "evalu
                 "routing_decision": all_results.get("routing_decision", "N/A"),\
                 "contradiction_flag": all_results.get("contradiction_flag", False),\
                 "nli_scores": all_results.get("nli_scores", {}),\
-                "factual_flag": all_results.get("factual_flag", False),\
-                "factual_score": all_results.get("factual_score", None) # Set to None when not run
+                "factual_flag": False, # Always false since factuality validation is removed
+                "factual_score": None # Always None since factuality validation is removed
             }
             results.append(result)
             print("Done.")
@@ -107,7 +104,6 @@ def run_evaluation(model_id: str = "gpt-4.1-nano", output_csv_path: str = "evalu
         print(f"Total Prompts: {total_prompts}")
         print(f"Fallback Routing Decisions: {fallback_count} ({fallback_count/total_prompts:.2%})")
         print(f"Contradictions Detected (NLI): {contradiction_count} ({contradiction_count/total_prompts:.2%})")
-        print(f"Factual Issues Detected: {factual_issue_count} ({factual_issue_count/total_prompts:.2%})")
 
         # Example: Average Entropy
         valid_entropies = [r["entropy"] for r in results if r["entropy"] is not None]
