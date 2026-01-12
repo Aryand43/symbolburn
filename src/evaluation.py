@@ -46,22 +46,27 @@ def run_evaluation(model_id: str = "gpt-4.1-nano", output_csv_path: str = "evalu
 
             routing_decision_output = scheduler.route(neural_output)
 
-            # Explicitly run validators to collect all metrics
-            nli_validation_results = nli_validator.validate(neural_output)
-            factuality_validation_results = factuality_validator.validate(neural_output)
+            # Initialize validation results to default (None/False)
+            nli_validation_results = {"contradiction_flag": False, "nli_scores": {}}
+            factuality_validation_results = {"factual_flag": False, "factual_score": None}
 
+            if routing_decision_output.get("routing_decision") == "fallback_validation":
+                # Run validators only if routing decision is fallback_validation
+                nli_validation_results = nli_validator.validate(neural_output)
+                factuality_validation_results = factuality_validator.validate(neural_output)
+            
             # Merge all results
             all_results = {**neural_output, **routing_decision_output, **nli_validation_results, **factuality_validation_results}
 
             result = {
-                "prompt": prompt_content,
-                "model": model_id,
-                "entropy": all_results.get("entropy"),
-                "routing_decision": all_results.get("routing_decision", "N/A"),
-                "contradiction_flag": all_results.get("contradiction_flag", False),
-                "nli_scores": all_results.get("nli_scores", {}),
-                "factual_flag": all_results.get("factual_flag", False),
-                "factual_score": all_results.get("factual_score", 0.0)
+                "prompt": prompt_content,\
+                "model": model_id,\
+                "entropy": all_results.get("entropy"),\
+                "routing_decision": all_results.get("routing_decision", "N/A"),\
+                "contradiction_flag": all_results.get("contradiction_flag", False),\
+                "nli_scores": all_results.get("nli_scores", {}),\
+                "factual_flag": all_results.get("factual_flag", False),\
+                "factual_score": all_results.get("factual_score", None) # Set to None when not run
             }
             results.append(result)
             print("Done.")
