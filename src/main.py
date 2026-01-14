@@ -1,22 +1,7 @@
 import sys
-from .langdb_client import LangDBClient
-from .config import LANGDB_API_KEY, LANGDB_PROJECT_ID
-from .neural_generator import NeuralGenerator
-from .scheduler import Scheduler
-from .strategies.direct_response_strategy import DirectResponseStrategy
-from .strategies.high_entropy_strategy import HighEntropyStrategy
+from .evaluation import run_full_pipeline
 
 def main():
-    client = LangDBClient(api_key=LANGDB_API_KEY, project_id=LANGDB_PROJECT_ID)
-    generator = NeuralGenerator(langdb_client=client)
-
-    # Initialize Scheduler with strategies (HighEntropyStrategy first)
-    strategies = [
-        HighEntropyStrategy(threshold=0.5),  # Example threshold
-        DirectResponseStrategy()
-    ]
-    scheduler = Scheduler(strategies=strategies)
-
     available_models = [
         "gpt-4.1-nano",
         "gpt-4o-mini",
@@ -43,32 +28,8 @@ def main():
 
     print(f"\nSelected Model: {selected_model}")
 
-    try:
-        neural_output = generator.generate(
-            model=selected_model,
-            messages=[{"role": "user", "content": "Write a haiku about recursion in programming."}],
-            temperature=0.8,
-            max_tokens=1000
-        )
-        print("\nGenerated Text:", neural_output["text"])
-        print("\nRaw API Response:", neural_output["raw"])
-        print("\nComputed Entropy:", neural_output["entropy"])
-        print("\nTool Flag:", neural_output["tool_flag"])
+    run_full_pipeline(selected_model)
 
-        # Call the scheduler to get a routing decision
-        routing_decision_output = scheduler.route(neural_output)
-        if "routing_decision" in routing_decision_output:
-            print(f"\nRouting Decision: {routing_decision_output["routing_decision"]}")
-        else:
-            print("\nValidation Results:")
-            for key, value in routing_decision_output.items():
-                print(f"  {key}: {value}")
-            if "factual_score" in routing_decision_output:
-                print(f"  Factual Score: {routing_decision_output["factual_score"]}")
-                print(f"  Factual Flag: {routing_decision_output["factual_flag"]}")
-
-    except Exception as e:
-        print(f"An error occurred: {e}")
 
 if __name__ == "__main__":
     main()

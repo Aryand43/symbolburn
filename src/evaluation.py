@@ -9,7 +9,8 @@ from .strategies.high_entropy_strategy import HighEntropyStrategy
 
 from .validators.nli_contradiction_validator import NLIContradictionValidator
 
-def run_evaluation(model_id: str = "gpt-4.1-nano", output_csv_path: str = "evaluation_results.csv"):
+def run_full_pipeline(model_id: str = "gpt-4.1-nano", output_csv_path: str = "evaluation_results.csv"):
+
     client = LangDBClient(api_key=LANGDB_API_KEY, project_id=LANGDB_PROJECT_ID)
     generator = NeuralGenerator(langdb_client=client)
 
@@ -118,20 +119,24 @@ if __name__ == "__main__":
     # python -m src.evaluation [model_id]
     import sys
     selected_model = "gpt-4.1-nano"
+    output_csv_path = "evaluation_results.csv" # Default output path
     if len(sys.argv) > 1:
         selected_model = sys.argv[1]
     
     # Check if selected_model is one of the available models, if not print a warning
     # and use default.
-    available_models = [\
-        "gpt-4.1-nano",\
-        "gpt-4o-mini",\
-        "claude-3-haiku-20240307",\
-        "gemini-2.0-flash"\
+    available_models = [
+        "gpt-4.1-nano",
+        "gpt-4o-mini",
+        "claude-3-haiku-20240307",
+        "gemini-2.0-flash"
     ]
     if selected_model not in available_models:
-        print(f"Warning: Unknown model \\'{selected_model}\\'. Using default model: gpt-4.1-nano")
+        print(f"Warning: Unknown model \'{selected_model}\'. Using default model: gpt-4.1-nano")
         selected_model = "gpt-4.1-nano"
 
-    run_evaluation(model_id=selected_model)
+    run_evaluation(model_id=selected_model, output_csv_path=output_csv_path)
+
+def run_evaluation(model_id: str = "gpt-4.1-nano", output_csv_path: str = "evaluation_results.csv"):
+    run_full_pipeline(model_id, output_csv_path)
 
