@@ -19,11 +19,17 @@ from eval.evaluate import evaluate_predictions
 from eval.datasets.truthfulqa import load_truthfulqa
 from eval.metrics import compute_all_metrics
 
+RATE_LIMIT_SECONDS = 3.5
+MAX_API_CALLS = 3
+api_calls = 0
+
 def run_full_pipeline(dataset_name: str, strategy_config: Dict[str, Any], seed: int, model_id: str = "gpt-4.1-nano", prompt_limit: int = 20):
 
     random.seed(seed)
     np.random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
+
+    prompt_limit = min(prompt_limit, 5) # temporary safety cap
 
     client = LangDBClient(api_key=LANGDB_API_KEY, project_id=LANGDB_PROJECT_ID)
     generator = NeuralGenerator(langdb_client=client)
@@ -55,7 +61,12 @@ def run_full_pipeline(dataset_name: str, strategy_config: Dict[str, Any], seed: 
         while True:
             start_time = time.time()
             try:
-                time.sleep(random.uniform(1, 2))
+                time.sleep(RATE_LIMIT_SECONDS)
+
+                global api_calls
+                if api_calls >= MAX_API_CALLS:
+                    raise RuntimeError("API call cap reached. Stopping.")
+                api_calls += 1
 
                 neural_output = generator.generate(
                     model=model_id,
@@ -100,35 +111,7 @@ def run_full_pipeline(dataset_name: str, strategy_config: Dict[str, Any], seed: 
                 break # Break out of while True loop, move to next prompt
 
             except openai.RateLimitError as e:
-                if rate_limit_retries == 0:
-                    print(f"[{i+1}/{len(questions)}] Rate limit hit. Pausing for 30-60s and retrying...")
-                    sys.stdout.flush()
-                    time.sleep(random.uniform(30, 60)) # Pause for 30-60 seconds
-                    rate_limit_retries += 1
-                elif rate_limit_retries == 1:
-                    print(f"[{i+1}/{len(questions)}] Rate limit hit again. Pausing for 60-120s and retrying...")
-                    sys.stdout.flush()
-                    time.sleep(random.uniform(60, 120)) # Pause for 60-120 seconds
-                    rate_limit_retries += 1
-                else:
-                    end_time = time.time()
-                    latency = end_time - start_time
-                    print(f"[{i+1}/{len(questions)}] Persistent rate limit after multiple retries. Aborting run.")
-                    sys.stdout.flush()
-                    generated_results.append({
-                        "Question": prompt_content,
-                        "Model": model_id,
-                        "ModelAnswer": "Error",
-                        "entropy": None,
-                        "routing_decision": "Error",
-                        "contradiction_flag": False,
-                        "nli_scores": {},
-                        "factual_flag": False,
-                        "factual_score": None,
-                        "latency": latency
-                    })
-                    predictions_for_eval.append({"Question": prompt_content, "ModelAnswer": "Error"})
-                    return # Abort the run cleanly
+                raise RuntimeError("LangDB quota exceeded. Aborting run.")
 
             except Exception as e:
                 end_time = time.time()

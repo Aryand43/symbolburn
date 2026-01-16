@@ -8,6 +8,7 @@ class LangDBClient:
         self.client = OpenAI(
             base_url="https://api.us-east-1.langdb.ai",
             api_key=api_key,
+            max_retries=0
         )
         self.project_id = project_id
 
