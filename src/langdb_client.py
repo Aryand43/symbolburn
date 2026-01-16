@@ -11,11 +11,17 @@ class LangDBClient:
         )
         self.project_id = project_id
 
-    def create_chat_completion(self, model: str, messages: list, **kwargs):
+    def create_chat_completion(self, model: str, messages: list, seed: int = None, prompt_cache_key: str = None, **kwargs):
+        headers = {"x-project-id": self.project_id}
+        if seed is not None:
+            headers["x-seed"] = str(seed)
+        if prompt_cache_key is not None:
+            headers["x-prompt-cache-key"] = prompt_cache_key
+
         response = self.client.chat.completions.create(
             model=model,
             messages=messages,
-            extra_headers={"x-project-id": self.project_id},
+            extra_headers=headers,
             **kwargs
         )
         return response.to_dict()

@@ -8,7 +8,7 @@ class NeuralGenerator:
         self.entropy_extractor = EntropyExtractor()
         self.tool_intent_extractor = ToolIntentExtractor()
 
-    def generate(self, model: str, messages: list, temperature: float, max_tokens: int):
+    def generate(self, model: str, messages: list, temperature: float, max_tokens: int, seed: int = None, prompt_cache_key: str = None):
         # Perform the API call using LangDBClient, requesting logprobs
         raw_response = self.langdb_client.create_chat_completion(
             model=model,
@@ -16,7 +16,9 @@ class NeuralGenerator:
             temperature=temperature,
             max_tokens=max_tokens,
             logprobs=True,  # Request logprobs from the API
-            stream=False
+            stream=False,
+            seed=seed,
+            prompt_cache_key=prompt_cache_key
         )
 
         text_content = ""

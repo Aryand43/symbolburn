@@ -1,4 +1,11 @@
-import csv
+import pandas as pd
+import random
+import numpy as np
+import os
+import sys
+import time
+import openai
+import hashlib
 from typing import List, Dict, Any
 from .langdb_client import LangDBClient
 from .config import LANGDB_API_KEY, LANGDB_PROJECT_ID
@@ -8,123 +15,196 @@ from .strategies.direct_response_strategy import DirectResponseStrategy
 from .strategies.high_entropy_strategy import HighEntropyStrategy
 
 from .validators.nli_contradiction_validator import NLIContradictionValidator
+from eval.evaluate import evaluate_predictions
+from eval.datasets.truthfulqa import load_truthfulqa
+from eval.metrics import compute_all_metrics
 
-def run_full_pipeline(model_id: str = "gpt-4.1-nano", output_csv_path: str = "evaluation_results.csv"):
+def run_full_pipeline(dataset_name: str, strategy_config: Dict[str, Any], seed: int, model_id: str = "gpt-4.1-nano", prompt_limit: int = 20):
+
+    random.seed(seed)
+    np.random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
 
     client = LangDBClient(api_key=LANGDB_API_KEY, project_id=LANGDB_PROJECT_ID)
     generator = NeuralGenerator(langdb_client=client)
 
     nli_validator = NLIContradictionValidator()
 
-    strategies = [
-        HighEntropyStrategy(threshold=0.5),  # Example threshold
-        DirectResponseStrategy()
-    ]
+    strategies = []
+    for strategy_name, config in strategy_config.items():
+        if strategy_name == "HighEntropyStrategy":
+            strategies.append(HighEntropyStrategy(threshold=config["threshold"]))
+        elif strategy_name == "DirectResponseStrategy":
+            strategies.append(DirectResponseStrategy())
     scheduler = Scheduler(strategies=strategies)
 
-    prompts = [
-        "Explain the concept of quantum entanglement in simple terms.",
-        "Write a short story about a detective who solves a case using only AI.",
-        "What are the main differences between Python and Java?",
-        "Describe the economic impact of renewable energy.",
-        "Write a haiku about recursion in programming."
-    ]
-
-    results: List[Dict[str, Any]] = []
-
-    for i, prompt_content in enumerate(prompts):
-        messages = [{"role": "user", "content": prompt_content}]
-        print(f"Running evaluation for prompt {i+1}/{len(prompts)}: \"{prompt_content[:50]}...\"", end=" ")
-        try:
-            neural_output = generator.generate(
-                model=model_id,
-                messages=messages,
-                temperature=0.8,
-                max_tokens=1000
-            )
-
-            routing_decision_output = scheduler.route(neural_output)
-
-            # Initialize validation results to default (None/False)
-            nli_validation_results = {"contradiction_flag": False, "nli_scores": {}}
-            factuality_validation_results = {"factual_flag": False, "factual_score": None}
-
-            if routing_decision_output.get("routing_decision") == "fallback_validation":
-                # Run validators only if routing decision is fallback_validation
-                nli_validation_results = nli_validator.validate(neural_output)
-
-            # Merge all results
-            all_results = {**neural_output, **routing_decision_output, **nli_validation_results}
-
-            result = {
-                "prompt": prompt_content,\
-                "model": model_id,\
-                "entropy": all_results.get("entropy"),\
-                "routing_decision": all_results.get("routing_decision", "N/A"),\
-                "contradiction_flag": all_results.get("contradiction_flag", False),\
-                "nli_scores": all_results.get("nli_scores", {}),\
-                "factual_flag": False, # Always false since factuality validation is removed
-                "factual_score": None # Always None since factuality validation is removed
-            }
-            results.append(result)
-            print("Done.")
-
-        except Exception as e:
-            print(f"Error for prompt \"{prompt_content[:50]}...\": {e}. Skipping.")
-            results.append({
-                "prompt": prompt_content,
-                "model": model_id,
-                "entropy": None,
-                "routing_decision": "Error",
-                "contradiction_flag": False,
-                "nli_scores": {},
-                "factual_flag": False,
-                "factual_score": 0.0
-            })
-            continue
-
-    # Write results to CSV
-    if results:
-        fieldnames = results[0].keys()
-        with open(output_csv_path, 'w', newline='', encoding='utf-8') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(results)
-        print(f"Evaluation results saved to {output_csv_path}")
+    if dataset_name == "TruthfulQA":
+        questions = load_truthfulqa("eval/TruthfulQA.csv")
     else:
-        print("No results to save.")
+        raise ValueError(f"Unknown dataset: {dataset_name}")
 
-    # Minimal aggregation utilities
-    print("\\n--- Aggregated Results ---")
-    if results:
-        total_prompts = len(results)
-        fallback_count = sum(1 for r in results if r.get("routing_decision") == "fallback_validation")
-        contradiction_count = sum(1 for r in results if r.get("contradiction_flag"))
-        factual_issue_count = sum(1 for r in results if not r.get("factual_flag"))
+    questions = questions[:prompt_limit]
 
-        print(f"Total Prompts: {total_prompts}")
-        print(f"Fallback Routing Decisions: {fallback_count} ({fallback_count/total_prompts:.2%})")
-        print(f"Contradictions Detected (NLI): {contradiction_count} ({contradiction_count/total_prompts:.2%})")
+    generated_results: List[Dict[str, Any]] = []
+    predictions_for_eval: List[Dict[str, str]] = []
 
-        # Example: Average Entropy
-        valid_entropies = [r["entropy"] for r in results if r["entropy"] is not None]
-        if valid_entropies:
-            avg_entropy = sum(valid_entropies) / len(valid_entropies)
-            print(f"Average Entropy: {avg_entropy:.4f}")
+    rate_limit_retries = 0
+    for i, prompt_content in enumerate(questions):
+        messages = [{"role": "user", "content": prompt_content}]
+        
+        while True:
+            start_time = time.time()
+            try:
+                time.sleep(random.uniform(1, 2))
 
-    print("--------------------------")
+                neural_output = generator.generate(
+                    model=model_id,
+                    messages=messages,
+                    temperature=0.8,
+                    max_tokens=256,
+                    seed=seed,
+                    prompt_cache_key=hashlib.md5(f"{prompt_content}-{model_id}-{seed}".encode()).hexdigest()
+                )
+                end_time = time.time()
+                latency = end_time - start_time
+                
+                rate_limit_retries = 0 # Reset on successful call
+
+                routing_decision_output = scheduler.route(neural_output)
+
+                nli_validation_results = {"contradiction_flag": False, "nli_scores": {}}
+                factuality_validation_results = {"factual_flag": False, "factual_score": None}
+
+                if routing_decision_output.get("routing_decision") == "fallback_validation":
+                    nli_validation_results = nli_validator.validate(neural_output)
+
+                all_results = {**neural_output, **routing_decision_output, **nli_validation_results}
+                all_results["latency"] = latency
+
+                print(f"[{i+1}/{len(questions)}] model={model_id} entropy={all_results.get("entropy", "None")} routing={all_results.get("routing_decision", "N/A")} latency={latency:.2f}s")
+                sys.stdout.flush()
+
+                generated_results.append({
+                    "Question": prompt_content,
+                    "Model": model_id,
+                    "ModelAnswer": all_results.get("text"),
+                    "entropy": all_results.get("entropy"),
+                    "routing_decision": all_results.get("routing_decision", "N/A"),
+                    "contradiction_flag": all_results.get("contradiction_flag", False),
+                    "nli_scores": all_results.get("nli_scores", {}),
+                    "factual_flag": False,
+                    "factual_score": None,
+                    "latency": latency
+                })
+                predictions_for_eval.append({"Question": prompt_content, "ModelAnswer": all_results.get("text")})
+                break # Break out of while True loop, move to next prompt
+
+            except openai.RateLimitError as e:
+                if rate_limit_retries == 0:
+                    print(f"[{i+1}/{len(questions)}] Rate limit hit. Pausing for 30-60s and retrying...")
+                    sys.stdout.flush()
+                    time.sleep(random.uniform(30, 60)) # Pause for 30-60 seconds
+                    rate_limit_retries += 1
+                elif rate_limit_retries == 1:
+                    print(f"[{i+1}/{len(questions)}] Rate limit hit again. Pausing for 60-120s and retrying...")
+                    sys.stdout.flush()
+                    time.sleep(random.uniform(60, 120)) # Pause for 60-120 seconds
+                    rate_limit_retries += 1
+                else:
+                    end_time = time.time()
+                    latency = end_time - start_time
+                    print(f"[{i+1}/{len(questions)}] Persistent rate limit after multiple retries. Aborting run.")
+                    sys.stdout.flush()
+                    generated_results.append({
+                        "Question": prompt_content,
+                        "Model": model_id,
+                        "ModelAnswer": "Error",
+                        "entropy": None,
+                        "routing_decision": "Error",
+                        "contradiction_flag": False,
+                        "nli_scores": {},
+                        "factual_flag": False,
+                        "factual_score": None,
+                        "latency": latency
+                    })
+                    predictions_for_eval.append({"Question": prompt_content, "ModelAnswer": "Error"})
+                    return # Abort the run cleanly
+
+            except Exception as e:
+                end_time = time.time()
+                latency = end_time - start_time
+                print(f"[{i+1}/{len(questions)}] model={model_id} error=\"{e}\" latency={latency:.2f}s")
+                sys.stdout.flush()
+                generated_results.append({
+                    "Question": prompt_content,
+                    "Model": model_id,
+                    "ModelAnswer": "Error",
+                    "entropy": None,
+                    "routing_decision": "Error",
+                    "contradiction_flag": False,
+                    "nli_scores": {},
+                    "factual_flag": False,
+                    "factual_score": None,
+                    "latency": latency
+                })
+                predictions_for_eval.append({"Question": prompt_content, "ModelAnswer": "Error"})
+                break # Break out of while True loop on other errors, move to next prompt
+
+    if generated_results:
+        generated_results_df = pd.DataFrame(generated_results)
+        strategy_name = list(strategy_config.keys())[0] if strategy_config else "NoStrategy"
+        output_csv_path = f"eval_results/{dataset_name}_{model_id}_{strategy_name}_seed{seed}.csv"
+        os.makedirs(os.path.dirname(output_csv_path), exist_ok=True)
+        generated_results_df.to_csv(output_csv_path, index=False)
+        print(f"Full pipeline results saved to {output_csv_path}")
+
+        print("\n--- Computed Metrics ---")
+        metrics = compute_all_metrics(generated_results_df)
+        for metric_name, value in metrics.items():
+            print(f"{metric_name}: {value:.4f}")
+        print("------------------------")
+    else:
+        print("No full pipeline results to save.")
+
+    predictions_path = f"eval_results/predictions_{dataset_name}_{model_id}_{strategy_name}_seed{seed}.csv"
+    predictions_df = pd.DataFrame(predictions_for_eval)
+    predictions_df.to_csv(predictions_path, index=False)
+    print(f"Predictions for evaluation saved to {predictions_path}")
+
+    print("\n--- Running TruthfulQA Evaluation ---")
+    evaluation_summary = evaluate_predictions(predictions_path, f"eval_results/eval_summary_{dataset_name}_{model_id}_{strategy_name}_seed{seed}.csv")
+    print("-------------------------------------")
+
+    print("\n--- TruthfulQA Accuracy ---")
+    print(f"TruthfulQA Accuracy: {evaluation_summary.get("accuracy", 0.0):.2f}")
+    print("---------------------------")
 
 if __name__ == "__main__":
-    # Example of how to run the evaluation from the command line
-    # python -m src.evaluation [model_id]
     import sys
     selected_model = "gpt-4.1-nano"
-    output_csv_path = "evaluation_results.csv" # Default output path
+    dataset_name = "TruthfulQA"
+    strategy_config = {"HighEntropyStrategy": {"threshold": 0.5}}
+    seed = 42
+    prompt_limit = 20 # Default prompt limit
+
     if len(sys.argv) > 1:
         selected_model = sys.argv[1]
-    
-    # Check if selected_model is one of the available models, if not print a warning
-    # and use default.
+    if len(sys.argv) > 2:
+        dataset_name = sys.argv[2]
+    if len(sys.argv) > 3:
+        strategy_name_arg = sys.argv[3]
+        if strategy_name_arg == "HighEntropyStrategy":
+            threshold = float(sys.argv[4]) if len(sys.argv) > 4 else 0.5
+            strategy_config = {"HighEntropyStrategy": {"threshold": threshold}}
+        elif strategy_name_arg == "DirectResponseStrategy":
+            strategy_config = {"DirectResponseStrategy": {}}
+        else:
+            print(f"Warning: Unknown strategy \'{strategy_name_arg}\'. Using default HighEntropyStrategy.")
+    if len(sys.argv) > 5:
+        seed = int(sys.argv[5])
+    if len(sys.argv) > 6:
+        prompt_limit = int(sys.argv[6]) # Read prompt limit from CLI
+
     available_models = [
         "gpt-4.1-nano",
         "gpt-4o-mini",
@@ -135,8 +215,9 @@ if __name__ == "__main__":
         print(f"Warning: Unknown model \'{selected_model}\'. Using default model: gpt-4.1-nano")
         selected_model = "gpt-4.1-nano"
 
-    run_evaluation(model_id=selected_model, output_csv_path=output_csv_path)
+    run_full_pipeline(dataset_name=dataset_name, strategy_config=strategy_config, seed=seed, model_id=selected_model, prompt_limit=prompt_limit)
 
 def run_evaluation(model_id: str = "gpt-4.1-nano", output_csv_path: str = "evaluation_results.csv"):
-    run_full_pipeline(model_id, output_csv_path)
-
+    print("Warning: run_evaluation is deprecated. Please use run_full_pipeline directly.")
+    run_full_pipeline(dataset_name="TruthfulQA", strategy_config={
+                      "HighEntropyStrategy": {"threshold": 0.5}}, seed=42, model_id=model_id, prompt_limit=20)
