@@ -25,4 +25,4 @@ class LangDBClient:
             extra_headers=headers,
             **kwargs
         )
-        return response.to_dict()
+        return response.model_dump()

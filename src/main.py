@@ -2,7 +2,7 @@ import sys
 from .evaluation import run_full_pipeline
 
 def main():
-    selected_model = "gpt-4.1-nano"
+    selected_model = "deepseek-r1"
     dataset_name = "TruthfulQA"
     strategy_config = {"HighEntropyStrategy": {"threshold": 0.5}}
     seed = 42
@@ -30,11 +30,13 @@ def main():
         "gpt-4.1-nano",
         "gpt-4o-mini",
         "claude-3-haiku-20240307",
-        "gemini-2.0-flash"
+        "gemini-2.0-flash",
+        "gpt-5.2-thinking",
+        "deepseek-r1"
     ]
     if selected_model not in available_models:
-        print(f"Warning: Unknown model \'{selected_model}\'. Using default model: gpt-4.1-nano")
-        selected_model = "gpt-4.1-nano"
+        print(f"Warning: Unknown model \'{selected_model}\'. Using default model: deepseek-r1")
+        selected_model = "deepseek-r1"
 
     output_csv_path = f"eval_results/{dataset_name}_{selected_model}_{list(strategy_config.keys())[0]}_seed{seed}.csv"
     run_full_pipeline(dataset_name=dataset_name, strategy_config=strategy_config, seed=seed, model_id=selected_model, prompt_limit=prompt_limit, output_csv_path=output_csv_path)
