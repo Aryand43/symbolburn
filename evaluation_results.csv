@@ -1,0 +1,6 @@
+prompt,model,entropy,routing_decision,contradiction_flag,nli_scores,factual_flag,factual_score
+Explain the concept of quantum entanglement in simple terms.,gpt-4.1-nano,,direct_response,False,{},False,
+Write a short story about a detective who solves a case using only AI.,gpt-4.1-nano,,direct_response,False,{},False,
+What are the main differences between Python and Java?,gpt-4.1-nano,,direct_response,False,{},False,
+Describe the economic impact of renewable energy.,gpt-4.1-nano,,direct_response,False,{},False,
+Write a haiku about recursion in programming.,gpt-4.1-nano,,direct_response,False,{},False,

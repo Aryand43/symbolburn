@@ -1,7 +1,5 @@
 import sys
-import pandas as pd
 from .evaluation import run_full_pipeline
-from eval.evaluate import evaluate_predictions
 
 def main():
     available_models = [
@@ -30,26 +28,7 @@ def main():
 
     print(f"\nSelected Model: {selected_model}")
 
-    # Run the full pipeline to generate predictions
-    run_full_pipeline(selected_model, output_csv_path="generated_predictions.csv")
-    
-    # For demonstration, assume generated_predictions.csv is the output of model inference.
-    # In a real scenario, run_full_pipeline would generate these and other metrics.
-    # We need to extract only the Question and ModelAnswer for evaluate_predictions.
-    
-    # Create a dummy predictions.csv for evaluate_predictions to consume
-    # In a full integration, `run_full_pipeline` would directly create this.
-    try:
-        full_results_df = pd.read_csv("generated_predictions.csv")
-        predictions_for_eval_df = full_results_df[['Question', 'text']].rename(columns={'text': 'ModelAnswer'})
-        predictions_for_eval_df.to_csv("predictions_for_eval.csv", index=False)
-        print("\nGenerated predictions for evaluation saved to predictions_for_eval.csv")
-    except Exception as e:
-        print(f"Error creating predictions for evaluation: {e}")
-        return
-
-    # Evaluate the generated predictions
-    evaluate_predictions("predictions_for_eval.csv", "final_eval_results.csv")
+    run_full_pipeline(selected_model, output_csv_path="eval/full_pipeline_results.csv")
 
 
 if __name__ == "__main__":
