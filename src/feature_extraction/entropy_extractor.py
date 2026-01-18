@@ -6,10 +6,10 @@ class EntropyExtractor:
         Compute the Shannon entropy averaged over all generated tokens.
         Formula: H = -Σ p_i * log(p_i)
         """
-        token_logprobs_list = raw_response.get("choices", [{}])[0].get("logprobs", {}).get("content", [])
+        token_logprobs_list = raw_response.get("choices", [{}])[0].get("logprobs", {}).get("tokens")
         
         if not token_logprobs_list:
-            return None  # Return None if no token logprobs are available
+            return 0.0  # Return 0.0 if no token logprobs are available
 
         total_entropy = 0.0
         for token_data in token_logprobs_list:

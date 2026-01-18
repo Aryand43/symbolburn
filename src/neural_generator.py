@@ -15,7 +15,7 @@ class NeuralGenerator:
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,
-            logprobs=True,  # Request logprobs from the API
+            logprobs=True, top_logprobs=1,  # Request logprobs from the API
             stream=False,
             seed=seed,
             prompt_cache_key=prompt_cache_key

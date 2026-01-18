@@ -23,7 +23,7 @@ RATE_LIMIT_SECONDS = 3.5
 MAX_API_CALLS = 3
 api_calls = 0
 
-def run_full_pipeline(dataset_name: str, strategy_config: Dict[str, Any], seed: int, model_id: str = "gpt-4.1-nano", prompt_limit: int = 20):
+def run_full_pipeline(dataset_name: str, strategy_config: Dict[str, Any], seed: int, output_csv_path: str, model_id: str = "gpt-4.1-nano", prompt_limit: int = 20):
 
     random.seed(seed)
     np.random.seed(seed)
@@ -76,6 +76,7 @@ def run_full_pipeline(dataset_name: str, strategy_config: Dict[str, Any], seed: 
                     seed=seed,
                     prompt_cache_key=hashlib.md5(f"{prompt_content}-{model_id}-{seed}".encode()).hexdigest()
                 )
+                time.sleep(1) # Latency buffer
                 end_time = time.time()
                 latency = end_time - start_time
                 
@@ -135,8 +136,6 @@ def run_full_pipeline(dataset_name: str, strategy_config: Dict[str, Any], seed: 
 
     if generated_results:
         generated_results_df = pd.DataFrame(generated_results)
-        strategy_name = list(strategy_config.keys())[0] if strategy_config else "NoStrategy"
-        output_csv_path = f"eval_results/{dataset_name}_{model_id}_{strategy_name}_seed{seed}.csv"
         os.makedirs(os.path.dirname(output_csv_path), exist_ok=True)
         generated_results_df.to_csv(output_csv_path, index=False)
         print(f"Full pipeline results saved to {output_csv_path}")
